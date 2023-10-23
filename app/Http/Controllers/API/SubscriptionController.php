@@ -39,8 +39,15 @@ class SubscriptionController extends Controller
         ]);
     }
 
-    public function choose()
+    public function choose(Request $request)
     {
+        /**
+         * @var User $user
+         */
+        $user = $request->user();
+        if($user->active_subscription()){
+            return response()->json(['message' => 'Post already have active subscription']);
+        }
         // generate payment link
         return response()->json([
             'url' => route('home'),

@@ -49,19 +49,9 @@ class PostController extends Controller
         $user = $request->user();
 
         if ($request->boolean('publish')) {
-            $subscription = $user->active_subscription();
-            if (!$subscription) {
-                return response()->json(['message' => 'Немає активної підписки'], 403);
-            }
-            if($subscription->remaining_publications > 0){
-                $subscription->remaining_publications -= 1;
-                $subscription->save();
-
-                $post->fill([
-                    'published_at' => Date::now(),
-                ]);
-            }else{
-                return response()->json(['message' => 'Недостатньо доступних постів для публікації'], 403);
+            $result = $this->checkPublish($user, $post);
+            if($result['code'] == 'error'){
+                return response()->json(['message' => $result['message']], 403);
             }
         }
 
@@ -85,7 +75,16 @@ class PostController extends Controller
     public function update(UpdateRequest $request, Post $post)
     {
         $post->update($request->validated());
-
+        /**
+         * @var User $user
+         */
+        $user = $post->user()->first();
+        if ($request->boolean('publish')) {
+            $result = $this->checkPublish($user, $post);
+            if($result['code'] == 'error'){
+                return response()->json(['message' => $result['message']], 403);
+            }
+        }
         return response()->json([
             'data' => $post->refresh(),
         ]);
@@ -104,21 +103,17 @@ class PostController extends Controller
 
     public function publish(Post $post)
     {
+        if($post->published_at){
+            return response()->json(['message' => 'Post already published']);
+        }
+        /**
+         * @var User $user
+         */
         $user = $post->user()->first();
 
-        $subscription = $user->active_subscription(); // todo
-        if (!$subscription) {
-            return response()->json(['message' => 'Немає активної підписки'], 403);
-        }
-        if($subscription->remaining_publications > 0){
-            $subscription->remaining_publications -= 1;
-            $subscription->save();
-
-            $post->fill([
-                'published_at' => Date::now(),
-            ]);
-        }else{
-            return response()->json(['message' => 'Недостатньо доступних постів для публікації'], 403);
+        $result = $this->checkPublish($user, $post);
+        if($result['code'] == 'error'){
+            return response()->json(['message' => $result['message']], 403);
         }
         $post->save();
 
@@ -128,7 +123,7 @@ class PostController extends Controller
     }
 
     public function unPublish(Post $post)
-    { // todo
+    { // todo if user unPublish post and publish same post we need to count this?
         $post->fill([
             'published_at' => null,
         ]);
@@ -137,5 +132,24 @@ class PostController extends Controller
         return response()->json([
             'data' => $post->refresh(),
         ]);
+    }
+
+    protected function checkPublish(User $user, Post $post)
+    {
+        $subscription = $user->active_subscription();
+        if (!$subscription) {
+            return ['code' => 'error' ,'message' => 'Немає активної підписки'];
+        }
+        if($subscription->remaining_publications > 0){
+            $subscription->remaining_publications -= 1;
+            $subscription->save();
+
+            $post->fill([
+                'published_at' => Date::now(),
+            ]);
+            return ['code' => 'success'];
+        }else{
+            return ['code' => 'error' ,'message' => 'Недостатньо доступних постів для публікації'];
+        }
     }
 }
