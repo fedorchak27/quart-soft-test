@@ -34,7 +34,6 @@ class BlogController extends Controller
                 $query->whereBetween('published_at', [$request->input('date_start'), $request->input('date_end')]);
             });
         }
-        //todo date
 
         $posts = $posts->orderBy('id', $request->input('sort_order', 'desc'))
             ->paginate();
